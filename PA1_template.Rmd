@@ -5,21 +5,149 @@ output:
     keep_md: true
 ---
 
-
 ## Loading and preprocessing the data
-
-
+```{r, echo=TRUE}
+activityMonitoringData <- read.csv(file = "activity.csv", 
+                                   na.strings = c("NA"), 
+                                   colClasses = c(steps="numeric", date="Date", interval="integer"))
+     
+```
 
 ## What is mean total number of steps taken per day?
+```{r, echo=TRUE}
+totalStepsPerDay <- aggregate(x = activityMonitoringData$steps,
+                              by = list(activityMonitoringData$date),
+                              FUN = sum)
+names(totalStepsPerDay) = c("date", "steps")
+```
 
+Here is a histogram of the total number of steps taken each day ignoring NAs:
+```{r, echo=TRUE}
+hist(totalStepsPerDay$steps, 
+     breaks = 50,
+     xlim = c(0, 25000),
+     ylim = c(0, 12),
+     main = "Histogram of Total Steps Per Day", 
+     xlab = "Total Steps Taken Per Day")
+```
+
+## What is mean total number of steps taken per day?
+```{r, echo=TRUE}
+meanStepsPerDay <- mean(totalStepsPerDay$steps, na.rm = TRUE)
+medianStepsPerDay <- median(totalStepsPerDay$steps, na.rm = TRUE)
+```
+
+Mean of the total number of steps taken per day: `r format(x = meanStepsPerDay,
+                                                            big.mark = ",",
+                                                            digits = 1,
+                                                            small.mark = ".",
+                                                            nsmall = 1,
+                                                            na.rm = TRUE)`
+
+Median of the total number of steps taken per day: `r format(x = medianStepsPerDay,
+                                                            big.mark = ",",
+                                                            digits = 1,
+                                                            small.mark = ".",
+                                                            nsmall = 1,
+                                                            na.rm = TRUE)`
 
 
 ## What is the average daily activity pattern?
+```{r, echo=TRUE}
+avgStepsPerTimeInterval <- aggregate(x = activityMonitoringData$steps,
+                                     by = list(activityMonitoringData$interval),
+                                     FUN = "mean",
+                                     na.rm = TRUE)
+names(avgStepsPerTimeInterval) = c("interval", "avgSteps")
 
+plot(avgStepsPerTimeInterval$interval,
+     avgStepsPerTimeInterval$avgSteps,
+     type = "l",
+     main = "Average Daily Activity Pattern",
+     xlab = "Time Interval",
+     ylab = "Average Total Steps")
 
+maxInterval <- as.character(avgStepsPerTimeInterval[which.max(avgStepsPerTimeInterval$avgSteps), "interval"])
+```
+
+5-minute interval which contains the maximum number of steps: `r maxInterval`
 
 ## Imputing missing values
+Total number of missing values in the dataset: `r format(sum(is.na(activityMonitoringData$steps)), big.mark = ",")`
 
+#### Replace all of the NA values with the average value for that particular 5-minute interval
+```{r, echo=TRUE}
 
+#### Create and fill a data.frame for all days with average data 
+everyDayAverageData <- activityMonitoringData
+everyDayAverageData$steps <- avgStepsPerTimeInterval$avgSteps
+
+#### Substitute the average values into a new imputed data.frame
+imputedActivityMonitoringData <- activityMonitoringData
+imputedActivityMonitoringData$steps <- ifelse(is.na(imputedActivityMonitoringData$steps),
+                                              everyDayAverageData$steps,
+                                              imputedActivityMonitoringData$steps)
+
+#### Now work with the imputed data
+imputedTotalStepsPerDay <- aggregate(x = imputedActivityMonitoringData$steps,
+                              by = list(imputedActivityMonitoringData$date),
+                              FUN = sum)
+names(imputedTotalStepsPerDay) = c("date", "steps")
+```
+
+Total number of missing values in the imputed dataset: `r format(sum(is.na(imputedActivityMonitoringData$steps)), big.mark = ",")`
+Here is a histogram of the total number of steps taken each day including imputed data:
+```{r, echo=TRUE}
+hist(imputedTotalStepsPerDay$steps, 
+     breaks = 50,
+     xlim = c(0, 25000),
+     ylim = c(0, 12),
+     main = "Histogram of Total Steps Per Day With Imputed Data", 
+     xlab = "Total Steps Taken Per Day")
+
+imputedMeanStepsPerDay <- mean(imputedTotalStepsPerDay$steps, na.rm = TRUE)
+imputedMedianStepsPerDay <- median(imputedTotalStepsPerDay$steps, na.rm = TRUE)
+```
+
+Mean of the total number of steps taken per day (with imputed data): `r format(x = imputedMeanStepsPerDay,
+                                                                                   big.mark = ",",
+                                                                                   digits = 1,
+                                                                                   small.mark = ".",
+                                                                                   nsmall = 1,
+                                                                                   na.rm = TRUE)`
+
+Median of the total number of steps taken per day (with imputed data): `r format(x = imputedMedianStepsPerDay,
+                                                                                   big.mark = ",",
+                                                                                   digits = 1,
+                                                                                   small.mark = ".",
+                                                                                   nsmall = 1,
+                                                                                   na.rm = TRUE)`
+
+Do these values differ from the estimates from the first part of the assignment? 
+  - The mean is the same, but the median is slightly different.
+
+What is the impact of imputing missing data on the estimates of the total daily number of steps?
+  - The mean doesn't change since you are only adding in average values, but the daily totals will increase.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+```{r, echo=TRUE}
+imputedActivityMonitoringData$weekDay <- factor(weekdays(imputedActivityMonitoringData$date))
+imputedActivityMonitoringData$weekPart <- factor(ifelse(imputedActivityMonitoringData$weekDay == "Saturday" |
+                                                             imputedActivityMonitoringData$weekDay == "Sunday",
+                                                        "weekend",
+                                                        "weekday"))
+
+avgStepsPerIntervalWeekPart <- aggregate(x=imputedActivityMonitoringData$steps,
+                                        by = list(imputedActivityMonitoringData$interval, imputedActivityMonitoringData$weekPart),
+                                        FUN = "mean",
+                                        na.rm = TRUE)
+names(avgStepsPerIntervalWeekPart) = c("interval", "weekpart", "avgSteps")
+
+library(lattice,)
+xyplot(avgSteps ~ interval | weekpart, 
+       data = avgStepsPerIntervalWeekPart, 
+       type = "l",
+       xlab = "Interval",
+       ylab = "Number of steps",
+       layout = c(1, 2))
+```
